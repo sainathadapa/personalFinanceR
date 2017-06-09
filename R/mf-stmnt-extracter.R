@@ -1,14 +1,33 @@
-extract_tables_custom <- function(file_location, password = NULL) {
-  params_list <- list(file = file_location,
-                      guess = FALSE,
-                      columns = list(c(70.5, 338.2, 375, 433, 492)))
+#' @importFrom data.table fread
+#' @export
+extract_raw_data_from_cams_stmnt <- function(file_location, password = NULL) {
 
-  if (!is.null(password)) params_list <- c(params_list, list(password = password))
+  tmp_file_path <- tempfile()
 
-  do.call(what = tabulizer::extract_tables, args = params_list)
+  args_list <- c('-jar',
+    system.file('tabula-0.9.2-jar-with-dependencies.jar', package = 'personalFinanceR', mustWork = TRUE),
+    '-c', '70.5,333,375,433,492',
+    '--pages', 'all',
+    '-o', tmp_file_path)
+
+  if (!is.null(password)) args_list <- c(args_list, '--password', password)
+
+  args_list <- c(args_list, file_location)
+
+  proc_out_status <- system2(command = 'java',
+                             args = args_list,
+                             stderr = FALSE)
+
+  if (proc_out_status != 0) stop('return status from tabula is not 0!')
+
+  extracted_data <- fread(tmp_file_path)
+
+  unlink(tmp_file_path)
+
+  return(extracted_data)
 }
 
-process_data <- function(extracted) {
+cams_stmnt_extracter <- function(file_location, password = NULL) {
 
   if (extracted %>% sapply(ncol) %>% equals(6) %>% all %>% not) stop('Number of columns doesnt equal six!')
 
