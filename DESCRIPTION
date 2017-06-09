@@ -4,6 +4,7 @@ Version: 0.0.0.9000
 Authors@R: person("Sainath", "Adapa", email = "adapasainath@gmail.com", role = c("aut", "cre"))
 Description: This package contains few functions that I personally use to analyze my investments and spending.
 Depends: R (>= 3.3.2)
+Imports: data.table
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
