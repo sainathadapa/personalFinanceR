@@ -1,7 +1,7 @@
 extract_raw_data_from_cams_stmnt <- function(file_location, password = NULL) {
-
+  
   tmp_file_path <- tempfile()
-
+  
   args_list <- c('-jar',
                  system.file('tabula-0.9.2-jar-with-dependencies.jar',
                              package = 'personalFinanceR',
@@ -9,30 +9,22 @@ extract_raw_data_from_cams_stmnt <- function(file_location, password = NULL) {
                  '-c', '70.5,333,375,433,492',
                  '--pages', 'all',
                  '-o', tmp_file_path)
-
+  
   if (!is.null(password)) args_list <- c(args_list, '--password', password)
-
+  
   args_list <- c(args_list, file_location)
-
+  
   proc_out_status <- system2(command = 'java',
                              args = args_list,
                              stderr = FALSE)
-
+  
   if (proc_out_status != 0) stop('return status from tabula is not 0!')
-
+  
   extracted_data <- fread(tmp_file_path, header = FALSE)
-
+  
   unlink(tmp_file_path)
-
+  
   return(extracted_data)
-}
-
-format_numbers <- function(x) {
-  x %>%
-    str_replace_all(pattern = ',', replacement = '') %>%
-    str_replace_all(pattern = '^\\(', replacement = '-') %>%
-    str_replace_all(pattern = '\\)$', replacement = '') %>%
-    as.numeric
 }
 
 #' @import data.table
