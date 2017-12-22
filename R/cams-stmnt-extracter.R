@@ -36,10 +36,11 @@ parse_each_section <- function(x) {
   purchases[, Units  := format_numbers(Units)]
   purchases[, Price  := format_numbers(Price)]
   purchases[, CumulativeUnits   := format_numbers(CumulativeUnits)]
-  purchases <- purchases[!is.na(purchases$Amount),]
+  purchases <- purchases[!is.na(purchases$Price),]
 
   folio_number <- x[1,] %>% as.character %>% paste0(collapse = '') %>%
-    str_extract_all('[0-9][[0-9]/ ]+') %>% extract2(1) %>% extract2(1)
+    str_extract_all('[0-9][[0-9]/ ]+') %>% extract2(1) %>% extract2(1) %>%
+    str_replace_all(' ', '')
 
   mf_name <- x[2,] %>% as.character %>% paste0(collapse = '') %>%
     str_trim %>%
@@ -51,7 +52,8 @@ parse_each_section <- function(x) {
     str_trim %>%
     stri_trans_totitle %>%
     str_replace_all('Hdfc', 'HDFC') %>%
-    str_replace_all('Icici', 'ICICI')
+    str_replace_all('Icici', 'ICICI') %>%
+    str_replace_all('^Birla', 'Aditya Birla')
 
   valuation_text <- x[nrow(x)] %>% as.character %>% paste0(collapse = '')
 
@@ -74,6 +76,7 @@ parse_each_section <- function(x) {
     format_numbers
 
   metadata <- data.table(Name = mf_name,
+                         Folio = folio_number,
                          Valuation = valuation,
                          ValuationDate = valuation_date,
                          NAV = nav,
@@ -102,11 +105,41 @@ cams_stmnt_extracter <- function(file_location, password = NULL) {
   start_locations <- full_lines %>% str_detect('Opening.*Unit.*Balance') %>% which %>% subtract(2)
   end_locations   <- full_lines %>% str_detect('Closing.*Unit.*Balance') %>% which
 
-  if (length(start_locations) != length(end_locations)) stop('Number of start locations does not match with number of end lcoations')
+  if (length(start_locations) != length(end_locations))
+    stop('Number of start locations does not match with number of end lcoations')
 
   ans <- Map(function(i,j) parse_each_section(tmp[i:j]), i = start_locations, j = end_locations)
+  names(ans) <- sapply(ans, function(x) paste(x$metadata$Folio, x$metadata$Name))
 
-  names(ans) <- sapply(ans, function(x) x$metadata$Name)
+  ans <- ans[order(names(ans))]
+
+  ans
+}
+
+#' @export
+combine_stmnts <- function(x) {
+  x <- unlist(x, recursive = FALSE)
+
+  duplicated_mfs <- names(x)[names(x) %in% names(x)[duplicated(names(x))]]
+  non_duplicated_mfs <- setdiff(names(x), duplicated_mfs)
+
+  duplicated_mfs_data <- lapply(duplicated_mfs, function(mf_nam) {
+    this_data <- x[names(x) %in% mf_nam]
+
+    purchases <- lapply(this_data, function(y) y$transactions) %>% rbindlist(use.names = TRUE, fill = FALSE)
+    purchases <- purchases[order(purchases$Date)]
+
+    which_latest <- which.max(sapply(this_data, function(y) y$metadata$ValuationDate))
+
+    list(metadata = this_data[[which_latest]]$metadata,
+         transactions = purchases)
+  })
+  names(duplicated_mfs_data) <- duplicated_mfs
+
+  non_duplicated_mfs <- x[names(x) %in% non_duplicated_mfs]
+
+  ans <- c(non_duplicated_mfs, duplicated_mfs_data)
+  ans <- ans[order(names(ans))]
 
   ans
 }
